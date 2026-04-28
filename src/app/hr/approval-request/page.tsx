@@ -33,6 +33,7 @@ export default function ApprovalRequest() {
   const [filter, setFilter] = useState<
     "all" | "pending" | "approved" | "rejected"
   >("all");
+  const [activePage] = useState("approval-request");
   const router = useRouter();
   const supabase = createClient();
 
@@ -49,21 +50,16 @@ export default function ApprovalRequest() {
         .select("*")
         .eq("id", authData.user.id)
         .single();
-
       if (prof?.role !== "hr") {
         router.push("/employee/dashboard");
         return;
       }
       setProfile(prof);
 
-      const { data: reqs, error } = await supabase
+      const { data: reqs } = await supabase
         .from("leave_requests")
         .select("*, profiles!leave_requests_employee_id_fkey(full_name, email)")
         .order("created_at", { ascending: false });
-
-      console.log("REQS:", reqs);
-      console.log("ERROR:", error);
-
       setRequests((reqs as LeaveRequest[]) || []);
       setLoading(false);
     };
@@ -75,7 +71,6 @@ export default function ApprovalRequest() {
       .from("leave_requests")
       .update({ status: "approved", reviewed_by: profile?.id })
       .eq("id", id);
-
     setRequests((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: "approved" } : r)),
     );
@@ -86,7 +81,6 @@ export default function ApprovalRequest() {
       .from("leave_requests")
       .update({ status: "rejected", reviewed_by: profile?.id })
       .eq("id", id);
-
     setRequests((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: "rejected" } : r)),
     );
@@ -97,146 +91,225 @@ export default function ApprovalRequest() {
     router.push("/");
   };
 
-  const filteredRequests = requests.filter((r) => {
-    if (filter === "all") return true;
-    return r.status === filter;
-  });
+  const filteredRequests = requests.filter((r) =>
+    filter === "all" ? true : r.status === filter,
+  );
+
+  const navItems = [
+    { label: "📊 Dashboard", href: "/hr/dashboard", key: "dashboard" },
+    {
+      label: "✅ Approval Request",
+      href: "/hr/approval-request",
+      key: "approval-request",
+    },
+    {
+      label: "📅 Mark Attendance",
+      href: "/hr/mark-attendance",
+      key: "mark-attendance",
+    },
+    { label: "👥 Employees", href: "/hr/employees", key: "employees" },
+    {
+      label: "📋 Attendance Overview",
+      href: "/hr/attendance-overview",
+      key: "attendance-overview",
+    },
+    {
+      label: "⚖️ Leave Balances",
+      href: "/hr/leave-balances",
+      key: "leave-balances",
+    },
+  ];
 
   if (loading) {
     return (
-      <div style={{ padding: "40px", fontFamily: "sans-serif" }}>
-        Loading...
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          fontFamily: "sans-serif",
+          flexDirection: "column",
+          gap: "16px",
+        }}
+      >
+        <div
+          style={{
+            width: "40px",
+            height: "40px",
+            border: "3px solid #e0e0e0",
+            borderTopColor: "#4A6CF7",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+          }}
+        />
+        <p style={{ color: "#4A6CF7", fontWeight: "600" }}>Loading...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   return (
     <div
-      style={{ display: "flex", minHeight: "100vh", fontFamily: "sans-serif" }}
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        fontFamily: "'Segoe UI', sans-serif",
+      }}
     >
       {/* Sidebar */}
       <div
         style={{
-          width: "220px",
+          width: "240px",
           minHeight: "100vh",
-          backgroundColor: "#4A6CF7",
+          background: "linear-gradient(180deg, #3451d1 0%, #4A6CF7 100%)",
           color: "white",
           display: "flex",
           flexDirection: "column",
-          padding: "20px",
+          boxShadow: "4px 0 15px rgba(74,108,247,0.15)",
         }}
       >
-        <h2 style={{ marginBottom: "20px", fontSize: "1.2rem" }}>EPortal</h2>
-
-        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+        <div
+          style={{
+            padding: "28px 24px 20px",
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
           <div
             style={{
-              width: "60px",
-              height: "60px",
-              borderRadius: "50%",
-              backgroundColor: "#fff",
-              margin: "0 auto 8px",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              fontSize: "1.5rem",
+              gap: "10px",
+              marginBottom: "20px",
             }}
           >
-            👤
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "10px",
+                backgroundColor: "rgba(255,255,255,0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.1rem",
+              }}
+            >
+              🏢
+            </div>
+            <span style={{ fontWeight: "700", fontSize: "1.1rem" }}>
+              HR Sphere
+            </span>
           </div>
-          <p
-            style={{ fontWeight: "bold", fontSize: "0.9rem", margin: "4px 0" }}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(255,255,255,0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.3rem",
+                flexShrink: 0,
+              }}
+            >
+              👤
+            </div>
+            <div style={{ overflow: "hidden" }}>
+              <p
+                style={{
+                  fontWeight: "600",
+                  fontSize: "0.9rem",
+                  margin: "0 0 2px",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {profile?.full_name}
+              </p>
+              <p
+                style={{
+                  fontSize: "0.72rem",
+                  opacity: 0.7,
+                  margin: 0,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {profile?.email}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: "16px 12px", flex: 1 }}>
+          {navItems.map((item) => (
+            <div
+              key={item.key}
+              onClick={() => router.push(item.href)}
+              style={{
+                padding: "11px 14px",
+                borderRadius: "10px",
+                cursor: "pointer",
+                marginBottom: "4px",
+                backgroundColor:
+                  activePage === item.key
+                    ? "rgba(255,255,255,0.2)"
+                    : "transparent",
+                borderLeft:
+                  activePage === item.key
+                    ? "3px solid white"
+                    : "3px solid transparent",
+                fontSize: "0.9rem",
+                fontWeight: activePage === item.key ? "600" : "400",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                if (activePage !== item.key)
+                  (e.currentTarget as HTMLDivElement).style.backgroundColor =
+                    "rgba(255,255,255,0.1)";
+              }}
+              onMouseLeave={(e) => {
+                if (activePage !== item.key)
+                  (e.currentTarget as HTMLDivElement).style.backgroundColor =
+                    "transparent";
+              }}
+            >
+              {item.label}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: "12px" }}>
+          <div
+            onClick={handleLogout}
+            style={{
+              padding: "11px 14px",
+              borderRadius: "10px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              backgroundColor: "rgba(244,67,54,0.15)",
+              color: "#ffcdd2",
+              fontSize: "0.9rem",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLDivElement).style.backgroundColor =
+                "rgba(244,67,54,0.3)")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLDivElement).style.backgroundColor =
+                "rgba(244,67,54,0.15)")
+            }
           >
-            {profile?.full_name}
-          </p>
-          <p style={{ fontSize: "0.75rem", opacity: 0.8, margin: 0 }}>
-            {profile?.email}
-          </p>
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/dashboard")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-          }}
-        >
-          📊 Dashboard
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/approval-request")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-            backgroundColor: "rgba(255,255,255,0.2)",
-          }}
-        >
-          ✅ Approval Request
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/mark-attendance")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-          }}
-        >
-          📅 Mark Attendance
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/employees")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-          }}
-        >
-          👥 Employees
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/attendance-overview")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-          }}
-        >
-          📋 Attendance Overview
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/leave-balances")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-          }}
-        >
-          ⚖️ Leave Balances
-        </div>
-
-        <div
-          onClick={handleLogout}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginTop: "auto",
-          }}
-        >
-          🚪 Logout
+            🚪 Logout
+          </div>
         </div>
       </div>
 
@@ -249,16 +322,24 @@ export default function ApprovalRequest() {
           overflowY: "auto",
         }}
       >
-        {/* Header */}
         <div
           style={{
             backgroundColor: "#fff",
-            padding: "16px 24px",
-            borderRadius: "10px",
+            padding: "18px 28px",
+            borderRadius: "14px",
             marginBottom: "24px",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
           }}
         >
-          <h2 style={{ margin: 0 }}>Approval Requests</h2>
+          <h2
+            style={{ margin: "0 0 4px", fontSize: "1.3rem", color: "#1a1a2e" }}
+          >
+            Approval Requests ✅
+          </h2>
+          <p style={{ margin: 0, color: "#888", fontSize: "0.85rem" }}>
+            {requests.filter((r) => r.status === "pending").length} pending
+            requests
+          </p>
         </div>
 
         {/* Filter Buttons */}
@@ -266,7 +347,7 @@ export default function ApprovalRequest() {
           style={{
             display: "flex",
             gap: "10px",
-            marginBottom: "24px",
+            marginBottom: "20px",
             flexWrap: "wrap",
           }}
         >
@@ -277,13 +358,18 @@ export default function ApprovalRequest() {
               style={{
                 padding: "8px 20px",
                 borderRadius: "20px",
-                border: "2px solid #4A6CF7",
+                border: "1.5px solid #4A6CF7",
                 cursor: "pointer",
-                backgroundColor: filter === f ? "#4A6CF7" : "#fff",
+                background:
+                  filter === f
+                    ? "linear-gradient(135deg, #4A6CF7, #3451d1)"
+                    : "#fff",
                 color: filter === f ? "white" : "#4A6CF7",
-                fontWeight: "bold",
+                fontWeight: "600",
                 fontSize: "0.85rem",
                 textTransform: "capitalize",
+                boxShadow:
+                  filter === f ? "0 4px 12px rgba(74,108,247,0.3)" : "none",
               }}
             >
               {f}
@@ -291,17 +377,17 @@ export default function ApprovalRequest() {
           ))}
         </div>
 
-        {/* Requests Table */}
         <div
           style={{
             backgroundColor: "#fff",
-            borderRadius: "10px",
+            borderRadius: "16px",
             padding: "24px",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
           }}
         >
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ borderBottom: "2px solid #eee" }}>
+              <tr style={{ backgroundColor: "#f8f9ff" }}>
                 {[
                   "Employee",
                   "Leave Type",
@@ -316,9 +402,11 @@ export default function ApprovalRequest() {
                     key={h}
                     style={{
                       textAlign: "left",
-                      padding: "12px",
+                      padding: "10px 12px",
                       color: "#555",
-                      fontSize: "0.85rem",
+                      fontSize: "0.8rem",
+                      fontWeight: "600",
+                      borderBottom: "2px solid #eee",
                     }}
                   >
                     {h}
@@ -332,22 +420,38 @@ export default function ApprovalRequest() {
                   <td
                     colSpan={8}
                     style={{
-                      padding: "30px",
+                      padding: "40px",
                       textAlign: "center",
                       color: "#aaa",
                     }}
                   >
+                    <div style={{ fontSize: "2.5rem", marginBottom: "10px" }}>
+                      📋
+                    </div>
                     No requests found
                   </td>
                 </tr>
               ) : (
                 filteredRequests.map((req) => (
-                  <tr key={req.id} style={{ borderBottom: "1px solid #eee" }}>
+                  <tr
+                    key={req.id}
+                    style={{ borderBottom: "1px solid #f5f5f5" }}
+                    onMouseEnter={(e) =>
+                      ((
+                        e.currentTarget as HTMLTableRowElement
+                      ).style.backgroundColor = "#f8f9ff")
+                    }
+                    onMouseLeave={(e) =>
+                      ((
+                        e.currentTarget as HTMLTableRowElement
+                      ).style.backgroundColor = "transparent")
+                    }
+                  >
                     <td
                       style={{
                         padding: "12px",
-                        fontSize: "0.85rem",
-                        fontWeight: "500",
+                        fontSize: "0.875rem",
+                        fontWeight: "600",
                       }}
                     >
                       {req.profiles?.full_name}
@@ -355,31 +459,49 @@ export default function ApprovalRequest() {
                     <td
                       style={{
                         padding: "12px",
-                        fontSize: "0.85rem",
+                        fontSize: "0.875rem",
                         textTransform: "capitalize",
                       }}
                     >
                       {req.leave_type} Leave
                     </td>
-                    <td style={{ padding: "12px", fontSize: "0.85rem" }}>
+                    <td
+                      style={{
+                        padding: "12px",
+                        fontSize: "0.8rem",
+                        color: "#666",
+                      }}
+                    >
                       {req.date_from}
                     </td>
-                    <td style={{ padding: "12px", fontSize: "0.85rem" }}>
+                    <td
+                      style={{
+                        padding: "12px",
+                        fontSize: "0.8rem",
+                        color: "#666",
+                      }}
+                    >
                       {req.date_to}
                     </td>
-                    <td style={{ padding: "12px", fontSize: "0.85rem" }}>
+                    <td
+                      style={{
+                        padding: "12px",
+                        fontSize: "0.8rem",
+                        color: "#666",
+                      }}
+                    >
                       {req.reason}
                     </td>
-                    <td style={{ padding: "12px", fontSize: "0.85rem" }}>
-                      {req.days_count} {req.days_count === 1 ? "Day" : "Days"}
+                    <td style={{ padding: "12px", fontSize: "0.875rem" }}>
+                      {req.days_count}d
                     </td>
                     <td style={{ padding: "12px" }}>
                       <span
                         style={{
-                          padding: "4px 10px",
-                          borderRadius: "12px",
-                          fontSize: "0.8rem",
-                          fontWeight: "bold",
+                          padding: "4px 12px",
+                          borderRadius: "20px",
+                          fontSize: "0.75rem",
+                          fontWeight: "700",
                           textTransform: "capitalize",
                           backgroundColor:
                             req.status === "approved"
@@ -408,13 +530,13 @@ export default function ApprovalRequest() {
                               color: "white",
                               border: "none",
                               padding: "6px 12px",
-                              borderRadius: "6px",
+                              borderRadius: "8px",
                               cursor: "pointer",
-                              fontSize: "0.8rem",
-                              fontWeight: "bold",
+                              fontSize: "0.78rem",
+                              fontWeight: "700",
                             }}
                           >
-                            Approve
+                            ✓ Approve
                           </button>
                           <button
                             onClick={() => handleReject(req.id)}
@@ -423,13 +545,13 @@ export default function ApprovalRequest() {
                               color: "white",
                               border: "none",
                               padding: "6px 12px",
-                              borderRadius: "6px",
+                              borderRadius: "8px",
                               cursor: "pointer",
-                              fontSize: "0.8rem",
-                              fontWeight: "bold",
+                              fontSize: "0.78rem",
+                              fontWeight: "700",
                             }}
                           >
-                            Reject
+                            ✗ Reject
                           </button>
                         </div>
                       )}
@@ -441,6 +563,8 @@ export default function ApprovalRequest() {
           </table>
         </div>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

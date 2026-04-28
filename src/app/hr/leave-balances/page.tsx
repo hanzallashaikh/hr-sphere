@@ -31,6 +31,7 @@ export default function LeaveBalances() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [activePage] = useState("leave-balances");
   const router = useRouter();
   const supabase = createClient();
 
@@ -47,14 +48,12 @@ export default function LeaveBalances() {
         .select("*")
         .eq("id", authData.user.id)
         .single();
-
       if (prof?.role !== "hr") {
         router.push("/employee/dashboard");
         return;
       }
       setProfile(prof);
 
-      // Fetch balances inline
       const { data: emps } = await supabase
         .from("profiles")
         .select("id, full_name, email")
@@ -86,46 +85,11 @@ export default function LeaveBalances() {
           casual_leave: bal?.casual_leave ?? 0,
         };
       });
-
       setBalances(combined);
       setLoading(false);
     };
     fetchData();
   }, []);
-  const fetchBalances = async () => {
-    const { data: emps } = await supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .eq("role", "employee")
-      .order("full_name", { ascending: true });
-
-    if (!emps || emps.length === 0) {
-      setBalances([]);
-      return;
-    }
-
-    const { data: bals } = await supabase
-      .from("leave_balances")
-      .select("*")
-      .in(
-        "employee_id",
-        emps.map((e) => e.id),
-      );
-
-    const combined: EmployeeBalance[] = emps.map((emp) => {
-      const bal = bals?.find((b) => b.employee_id === emp.id);
-      return {
-        employee_id: emp.id,
-        full_name: emp.full_name,
-        email: emp.email,
-        annual_leave: bal?.annual_leave ?? 0,
-        sick_leave: bal?.sick_leave ?? 0,
-        casual_leave: bal?.casual_leave ?? 0,
-      };
-    });
-
-    setBalances(combined);
-  };
 
   const handleEditOpen = (emp: EmployeeBalance) => {
     setEditingId(emp.employee_id);
@@ -149,10 +113,8 @@ export default function LeaveBalances() {
       setError("Leave balances cannot be negative");
       return;
     }
-
     setSaving(true);
     setError("");
-
     const { error: updateError } = await supabase
       .from("leave_balances")
       .update({
@@ -162,14 +124,11 @@ export default function LeaveBalances() {
         updated_at: new Date().toISOString(),
       })
       .eq("employee_id", employeeId);
-
     if (updateError) {
       setError("Failed to update: " + updateError.message);
       setSaving(false);
       return;
     }
-
-    // Update local state
     setBalances((prev) =>
       prev.map((b) =>
         b.employee_id === employeeId
@@ -182,7 +141,6 @@ export default function LeaveBalances() {
           : b,
       ),
     );
-
     setSuccess(`Leave balance for ${employeeName} updated successfully!`);
     setSaving(false);
     handleEditClose();
@@ -193,7 +151,6 @@ export default function LeaveBalances() {
       `Reset all leave balances for ${employeeName} to 10 days each?`,
     );
     if (!confirmed) return;
-
     const { error: resetError } = await supabase
       .from("leave_balances")
       .update({
@@ -203,12 +160,10 @@ export default function LeaveBalances() {
         updated_at: new Date().toISOString(),
       })
       .eq("employee_id", employeeId);
-
     if (resetError) {
       setError("Failed to reset: " + resetError.message);
       return;
     }
-
     setBalances((prev) =>
       prev.map((b) =>
         b.employee_id === employeeId
@@ -216,7 +171,6 @@ export default function LeaveBalances() {
           : b,
       ),
     );
-
     setSuccess(`Leave balance for ${employeeName} reset to 10 days each!`);
   };
 
@@ -224,6 +178,31 @@ export default function LeaveBalances() {
     await supabase.auth.signOut();
     router.push("/");
   };
+
+  const navItems = [
+    { label: "📊 Dashboard", href: "/hr/dashboard", key: "dashboard" },
+    {
+      label: "✅ Approval Request",
+      href: "/hr/approval-request",
+      key: "approval-request",
+    },
+    {
+      label: "📅 Mark Attendance",
+      href: "/hr/mark-attendance",
+      key: "mark-attendance",
+    },
+    { label: "👥 Employees", href: "/hr/employees", key: "employees" },
+    {
+      label: "📋 Attendance Overview",
+      href: "/hr/attendance-overview",
+      key: "attendance-overview",
+    },
+    {
+      label: "⚖️ Leave Balances",
+      href: "/hr/leave-balances",
+      key: "leave-balances",
+    },
+  ];
 
   if (loading) {
     return (
@@ -234,141 +213,185 @@ export default function LeaveBalances() {
           justifyContent: "center",
           height: "100vh",
           fontFamily: "sans-serif",
-          color: "#4A6CF7",
+          flexDirection: "column",
+          gap: "16px",
         }}
       >
-        Loading...
+        <div
+          style={{
+            width: "40px",
+            height: "40px",
+            border: "3px solid #e0e0e0",
+            borderTopColor: "#4A6CF7",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+          }}
+        />
+        <p style={{ color: "#4A6CF7", fontWeight: "600" }}>Loading...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   return (
     <div
-      style={{ display: "flex", minHeight: "100vh", fontFamily: "sans-serif" }}
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        fontFamily: "'Segoe UI', sans-serif",
+      }}
     >
       {/* Sidebar */}
       <div
         style={{
-          width: "220px",
+          width: "240px",
           minHeight: "100vh",
-          backgroundColor: "#4A6CF7",
+          background: "linear-gradient(180deg, #3451d1 0%, #4A6CF7 100%)",
           color: "white",
           display: "flex",
           flexDirection: "column",
-          padding: "20px",
+          boxShadow: "4px 0 15px rgba(74,108,247,0.15)",
         }}
       >
-        <h2 style={{ marginBottom: "20px", fontSize: "1.2rem" }}>EPortal</h2>
-
-        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+        <div
+          style={{
+            padding: "28px 24px 20px",
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
           <div
             style={{
-              width: "60px",
-              height: "60px",
-              borderRadius: "50%",
-              backgroundColor: "#fff",
-              margin: "0 auto 8px",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              fontSize: "1.5rem",
+              gap: "10px",
+              marginBottom: "20px",
             }}
           >
-            👤
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "10px",
+                backgroundColor: "rgba(255,255,255,0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.1rem",
+              }}
+            >
+              🏢
+            </div>
+            <span style={{ fontWeight: "700", fontSize: "1.1rem" }}>
+              HR Sphere
+            </span>
           </div>
-          <p
-            style={{ fontWeight: "bold", fontSize: "0.9rem", margin: "4px 0" }}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(255,255,255,0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.3rem",
+                flexShrink: 0,
+              }}
+            >
+              👤
+            </div>
+            <div style={{ overflow: "hidden" }}>
+              <p
+                style={{
+                  fontWeight: "600",
+                  fontSize: "0.9rem",
+                  margin: "0 0 2px",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {profile?.full_name}
+              </p>
+              <p
+                style={{
+                  fontSize: "0.72rem",
+                  opacity: 0.7,
+                  margin: 0,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {profile?.email}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: "16px 12px", flex: 1 }}>
+          {navItems.map((item) => (
+            <div
+              key={item.key}
+              onClick={() => router.push(item.href)}
+              style={{
+                padding: "11px 14px",
+                borderRadius: "10px",
+                cursor: "pointer",
+                marginBottom: "4px",
+                backgroundColor:
+                  activePage === item.key
+                    ? "rgba(255,255,255,0.2)"
+                    : "transparent",
+                borderLeft:
+                  activePage === item.key
+                    ? "3px solid white"
+                    : "3px solid transparent",
+                fontSize: "0.9rem",
+                fontWeight: activePage === item.key ? "600" : "400",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                if (activePage !== item.key)
+                  (e.currentTarget as HTMLDivElement).style.backgroundColor =
+                    "rgba(255,255,255,0.1)";
+              }}
+              onMouseLeave={(e) => {
+                if (activePage !== item.key)
+                  (e.currentTarget as HTMLDivElement).style.backgroundColor =
+                    "transparent";
+              }}
+            >
+              {item.label}
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: "12px" }}>
+          <div
+            onClick={handleLogout}
+            style={{
+              padding: "11px 14px",
+              borderRadius: "10px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              backgroundColor: "rgba(244,67,54,0.15)",
+              color: "#ffcdd2",
+              fontSize: "0.9rem",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) =>
+              ((e.currentTarget as HTMLDivElement).style.backgroundColor =
+                "rgba(244,67,54,0.3)")
+            }
+            onMouseLeave={(e) =>
+              ((e.currentTarget as HTMLDivElement).style.backgroundColor =
+                "rgba(244,67,54,0.15)")
+            }
           >
-            {profile?.full_name}
-          </p>
-          <p style={{ fontSize: "0.75rem", opacity: 0.8, margin: 0 }}>
-            {profile?.email}
-          </p>
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/dashboard")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-          }}
-        >
-          📊 Dashboard
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/approval-request")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-          }}
-        >
-          ✅ Approval Request
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/mark-attendance")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-          }}
-        >
-          📅 Mark Attendance
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/employees")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-          }}
-        >
-          👥 Employees
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/attendance-overview")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-          }}
-        >
-          📋 Attendance Overview
-        </div>
-
-        <div
-          onClick={() => router.push("/hr/leave-balances")}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginBottom: "6px",
-            backgroundColor: "rgba(255,255,255,0.2)",
-          }}
-        >
-          ⚖️ Leave Balances
-        </div>
-
-        <div
-          onClick={handleLogout}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            marginTop: "auto",
-          }}
-        >
-          🚪 Logout
+            🚪 Logout
+          </div>
         </div>
       </div>
 
@@ -381,49 +404,60 @@ export default function LeaveBalances() {
           overflowY: "auto",
         }}
       >
-        {/* Header */}
         <div
           style={{
             backgroundColor: "#fff",
-            padding: "16px 24px",
-            borderRadius: "10px",
+            padding: "18px 28px",
+            borderRadius: "14px",
             marginBottom: "24px",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
           }}
         >
-          <h2 style={{ margin: "0 0 4px" }}>Leave Balances</h2>
+          <h2
+            style={{ margin: "0 0 4px", fontSize: "1.3rem", color: "#1a1a2e" }}
+          >
+            Leave Balances ⚖️
+          </h2>
           <p style={{ margin: 0, color: "#888", fontSize: "0.85rem" }}>
             Manage and adjust employee leave balances
           </p>
         </div>
 
-        {/* Success Message */}
         {success && (
           <div
             style={{
               backgroundColor: "#e8f5e9",
+              border: "1px solid #c8e6c9",
               color: "#2e7d32",
               padding: "12px 16px",
-              borderRadius: "8px",
+              borderRadius: "10px",
               marginBottom: "20px",
-              fontWeight: "500",
+              fontSize: "0.875rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
             ✅ {success}
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
           <div
             style={{
               backgroundColor: "#ffebee",
+              border: "1px solid #ffcdd2",
               color: "#c62828",
               padding: "12px 16px",
-              borderRadius: "8px",
+              borderRadius: "10px",
               marginBottom: "20px",
+              fontSize: "0.875rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
-            {error}
+            ⚠️ {error}
           </div>
         )}
 
@@ -446,15 +480,17 @@ export default function LeaveBalances() {
             <div
               style={{
                 backgroundColor: "#fff",
-                borderRadius: "12px",
-                padding: "30px",
+                borderRadius: "16px",
+                padding: "32px",
                 width: "440px",
                 maxWidth: "90vw",
                 boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
               }}
             >
-              <h3 style={{ marginTop: 0, marginBottom: "20px" }}>
-                Edit Leave Balance
+              <h3
+                style={{ marginTop: 0, marginBottom: "20px", color: "#1a1a2e" }}
+              >
+                Edit Leave Balance ⚖️
               </h3>
 
               {error && (
@@ -463,11 +499,12 @@ export default function LeaveBalances() {
                     backgroundColor: "#ffebee",
                     color: "#c62828",
                     padding: "12px 16px",
-                    borderRadius: "8px",
+                    borderRadius: "10px",
                     marginBottom: "16px",
+                    fontSize: "0.875rem",
                   }}
                 >
-                  {error}
+                  ⚠️ {error}
                 </div>
               )}
 
@@ -478,95 +515,59 @@ export default function LeaveBalances() {
                   gap: "16px",
                 }}
               >
-                {/* Annual Leave */}
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "6px",
-                      fontWeight: "500",
-                      fontSize: "0.9rem",
-                      color: "#4CAF50",
-                    }}
-                  >
-                    Annual Leave (days)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={365}
-                    value={editAnnual}
-                    onChange={(e) => setEditAnnual(Number(e.target.value))}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      border: "2px solid #4CAF50",
-                      borderRadius: "8px",
-                      fontSize: "0.95rem",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                {/* Sick Leave */}
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "6px",
-                      fontWeight: "500",
-                      fontSize: "0.9rem",
-                      color: "#e91e8c",
-                    }}
-                  >
-                    Sick Leave (days)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={365}
-                    value={editSick}
-                    onChange={(e) => setEditSick(Number(e.target.value))}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      border: "2px solid #e91e8c",
-                      borderRadius: "8px",
-                      fontSize: "0.95rem",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                {/* Casual Leave */}
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: "6px",
-                      fontWeight: "500",
-                      fontSize: "0.9rem",
-                      color: "#2196F3",
-                    }}
-                  >
-                    Casual Leave (days)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={365}
-                    value={editCasual}
-                    onChange={(e) => setEditCasual(Number(e.target.value))}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      border: "2px solid #2196F3",
-                      borderRadius: "8px",
-                      fontSize: "0.95rem",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
+                {[
+                  {
+                    label: "Annual Leave (days)",
+                    value: editAnnual,
+                    onChange: setEditAnnual,
+                    color: "#4CAF50",
+                    border: "#4CAF50",
+                  },
+                  {
+                    label: "Sick Leave (days)",
+                    value: editSick,
+                    onChange: setEditSick,
+                    color: "#e91e8c",
+                    border: "#e91e8c",
+                  },
+                  {
+                    label: "Casual Leave (days)",
+                    value: editCasual,
+                    onChange: setEditCasual,
+                    color: "#2196F3",
+                    border: "#2196F3",
+                  },
+                ].map((field) => (
+                  <div key={field.label}>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: "8px",
+                        fontWeight: "600",
+                        fontSize: "0.875rem",
+                        color: field.color,
+                      }}
+                    >
+                      {field.label}
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={365}
+                      value={field.value}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                      style={{
+                        width: "100%",
+                        padding: "11px 14px",
+                        border: `2px solid ${field.border}`,
+                        borderRadius: "10px",
+                        fontSize: "0.95rem",
+                        boxSizing: "border-box",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
 
               <div
@@ -581,11 +582,12 @@ export default function LeaveBalances() {
                   onClick={handleEditClose}
                   style={{
                     padding: "10px 24px",
-                    borderRadius: "8px",
-                    border: "1px solid #ddd",
+                    borderRadius: "10px",
+                    border: "1.5px solid #e0e0e0",
                     backgroundColor: "#fff",
                     cursor: "pointer",
-                    fontSize: "0.95rem",
+                    fontSize: "0.9rem",
+                    color: "#555",
                   }}
                 >
                   Cancel
@@ -600,14 +602,15 @@ export default function LeaveBalances() {
                   disabled={saving}
                   style={{
                     padding: "10px 24px",
-                    borderRadius: "8px",
+                    borderRadius: "10px",
                     border: "none",
-                    backgroundColor: "#4A6CF7",
+                    background: saving
+                      ? "#a0aec0"
+                      : "linear-gradient(135deg, #4A6CF7, #3451d1)",
                     color: "white",
                     cursor: saving ? "not-allowed" : "pointer",
-                    fontWeight: "bold",
-                    fontSize: "0.95rem",
-                    opacity: saving ? 0.7 : 1,
+                    fontWeight: "700",
+                    fontSize: "0.9rem",
                   }}
                 >
                   {saving ? "Saving..." : "Save Changes"}
@@ -621,17 +624,17 @@ export default function LeaveBalances() {
         <div
           style={{
             backgroundColor: "#fff",
-            borderRadius: "10px",
+            borderRadius: "16px",
             padding: "24px",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
           }}
         >
-          <h3 style={{ marginTop: 0, marginBottom: "16px" }}>
+          <h3 style={{ marginTop: 0, marginBottom: "16px", color: "#1a1a2e" }}>
             All Employee Leave Balances
           </h3>
-
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ borderBottom: "2px solid #eee" }}>
+              <tr style={{ backgroundColor: "#f8f9ff" }}>
                 {[
                   "Employee",
                   "Email",
@@ -644,9 +647,11 @@ export default function LeaveBalances() {
                     key={h}
                     style={{
                       textAlign: "left",
-                      padding: "12px",
+                      padding: "10px 12px",
                       color: "#555",
-                      fontSize: "0.85rem",
+                      fontSize: "0.8rem",
+                      fontWeight: "600",
+                      borderBottom: "2px solid #eee",
                     }}
                   >
                     {h}
@@ -660,11 +665,14 @@ export default function LeaveBalances() {
                   <td
                     colSpan={6}
                     style={{
-                      padding: "30px",
+                      padding: "40px",
                       textAlign: "center",
                       color: "#aaa",
                     }}
                   >
+                    <div style={{ fontSize: "2.5rem", marginBottom: "10px" }}>
+                      👥
+                    </div>
                     No employees found
                   </td>
                 </tr>
@@ -672,7 +680,17 @@ export default function LeaveBalances() {
                 balances.map((emp) => (
                   <tr
                     key={emp.employee_id}
-                    style={{ borderBottom: "1px solid #eee" }}
+                    style={{ borderBottom: "1px solid #f5f5f5" }}
+                    onMouseEnter={(e) =>
+                      ((
+                        e.currentTarget as HTMLTableRowElement
+                      ).style.backgroundColor = "#f8f9ff")
+                    }
+                    onMouseLeave={(e) =>
+                      ((
+                        e.currentTarget as HTMLTableRowElement
+                      ).style.backgroundColor = "transparent")
+                    }
                   >
                     <td style={{ padding: "12px" }}>
                       <div
@@ -684,18 +702,20 @@ export default function LeaveBalances() {
                       >
                         <div
                           style={{
-                            width: "34px",
-                            height: "34px",
+                            width: "36px",
+                            height: "36px",
                             borderRadius: "50%",
-                            backgroundColor: "#e0e0e0",
+                            background:
+                              "linear-gradient(135deg, #4A6CF7, #3451d1)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
+                            color: "white",
                           }}
                         >
                           👤
                         </div>
-                        <span style={{ fontWeight: "500", fontSize: "0.9rem" }}>
+                        <span style={{ fontWeight: "600", fontSize: "0.9rem" }}>
                           {emp.full_name}
                         </span>
                       </div>
@@ -710,7 +730,7 @@ export default function LeaveBalances() {
                       {emp.email}
                     </td>
 
-                    {/* Annual Leave */}
+                    {/* Annual */}
                     <td style={{ padding: "12px" }}>
                       <div
                         style={{
@@ -725,8 +745,8 @@ export default function LeaveBalances() {
                             color: "#2e7d32",
                             padding: "4px 12px",
                             borderRadius: "10px",
-                            fontSize: "0.85rem",
-                            fontWeight: "bold",
+                            fontSize: "0.82rem",
+                            fontWeight: "700",
                           }}
                         >
                           {emp.annual_leave} days
@@ -736,15 +756,15 @@ export default function LeaveBalances() {
                             flex: 1,
                             backgroundColor: "#e8f5e9",
                             borderRadius: "10px",
-                            height: "6px",
-                            minWidth: "60px",
+                            height: "5px",
+                            minWidth: "50px",
                           }}
                         >
                           <div
                             style={{
                               backgroundColor: "#4CAF50",
                               borderRadius: "10px",
-                              height: "6px",
+                              height: "5px",
                               width: `${Math.min((emp.annual_leave / 10) * 100, 100)}%`,
                             }}
                           />
@@ -752,7 +772,7 @@ export default function LeaveBalances() {
                       </div>
                     </td>
 
-                    {/* Sick Leave */}
+                    {/* Sick */}
                     <td style={{ padding: "12px" }}>
                       <div
                         style={{
@@ -767,8 +787,8 @@ export default function LeaveBalances() {
                             color: "#c62828",
                             padding: "4px 12px",
                             borderRadius: "10px",
-                            fontSize: "0.85rem",
-                            fontWeight: "bold",
+                            fontSize: "0.82rem",
+                            fontWeight: "700",
                           }}
                         >
                           {emp.sick_leave} days
@@ -778,15 +798,15 @@ export default function LeaveBalances() {
                             flex: 1,
                             backgroundColor: "#fce4ec",
                             borderRadius: "10px",
-                            height: "6px",
-                            minWidth: "60px",
+                            height: "5px",
+                            minWidth: "50px",
                           }}
                         >
                           <div
                             style={{
                               backgroundColor: "#e91e8c",
                               borderRadius: "10px",
-                              height: "6px",
+                              height: "5px",
                               width: `${Math.min((emp.sick_leave / 10) * 100, 100)}%`,
                             }}
                           />
@@ -794,7 +814,7 @@ export default function LeaveBalances() {
                       </div>
                     </td>
 
-                    {/* Casual Leave */}
+                    {/* Casual */}
                     <td style={{ padding: "12px" }}>
                       <div
                         style={{
@@ -809,8 +829,8 @@ export default function LeaveBalances() {
                             color: "#1565c0",
                             padding: "4px 12px",
                             borderRadius: "10px",
-                            fontSize: "0.85rem",
-                            fontWeight: "bold",
+                            fontSize: "0.82rem",
+                            fontWeight: "700",
                           }}
                         >
                           {emp.casual_leave} days
@@ -820,15 +840,15 @@ export default function LeaveBalances() {
                             flex: 1,
                             backgroundColor: "#e3f2fd",
                             borderRadius: "10px",
-                            height: "6px",
-                            minWidth: "60px",
+                            height: "5px",
+                            minWidth: "50px",
                           }}
                         >
                           <div
                             style={{
                               backgroundColor: "#2196F3",
                               borderRadius: "10px",
-                              height: "6px",
+                              height: "5px",
                               width: `${Math.min((emp.casual_leave / 10) * 100, 100)}%`,
                             }}
                           />
@@ -836,7 +856,6 @@ export default function LeaveBalances() {
                       </div>
                     </td>
 
-                    {/* Actions */}
                     <td style={{ padding: "12px" }}>
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button
@@ -846,10 +865,10 @@ export default function LeaveBalances() {
                             color: "#1565c0",
                             border: "none",
                             padding: "6px 12px",
-                            borderRadius: "6px",
+                            borderRadius: "8px",
                             cursor: "pointer",
                             fontSize: "0.8rem",
-                            fontWeight: "bold",
+                            fontWeight: "700",
                           }}
                         >
                           ✏️ Edit
@@ -863,10 +882,10 @@ export default function LeaveBalances() {
                             color: "#f57f17",
                             border: "none",
                             padding: "6px 12px",
-                            borderRadius: "6px",
+                            borderRadius: "8px",
                             cursor: "pointer",
                             fontSize: "0.8rem",
-                            fontWeight: "bold",
+                            fontWeight: "700",
                           }}
                         >
                           🔄 Reset
@@ -880,6 +899,7 @@ export default function LeaveBalances() {
           </table>
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
